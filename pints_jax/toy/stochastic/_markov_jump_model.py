@@ -14,6 +14,7 @@ import jax
 import jax.numpy as jnp
 import jax.scipy
 from jax_cosmo import scipy as jcospy
+import jax.lax as lax
 
 import random as rnd
 
@@ -160,6 +161,8 @@ class MarkovJumpModel(pints.ForwardModel, ToyModel):
             # Store new values
             self.time.append(arr[1])
             self.mol_count.append(x)
+            jnp.asarray(self.time)
+            jnp.asarray(self.mol_count)
             
             return arr
 
@@ -169,7 +172,8 @@ class MarkovJumpModel(pints.ForwardModel, ToyModel):
 
     def sorted_interp(self, x, xp, fp):
         m = x.shape[0]
-        n = xp.shape[0]
+        # n = xp.shape[0]
+        n = len(xp)
         x = jnp.atleast_1d(x)
         j = 0
         xp_0 = xp[0]
@@ -220,28 +224,28 @@ class MarkovJumpModel(pints.ForwardModel, ToyModel):
         _, f = lax.scan(body_fun, 0, x)
         return f
         
-    # def interp(self, x, xp, fp, left=None, right=None, period=None):
-    #     x, xp, fp = map(jnp.asarray, (x, xp, fp))
-    #     if period:
-    #         x = x % period
-    #         xp = xp % period
-    #         i = jnp.argsort(xp)
-    #         xp = xp[i]
-    #         fp = fp[i]
-    #         xp = jnp.concatenate([xp[-1:] - period, xp, xp[:1] + period])
-    #         fp = jnp.concatenate([fp[-1:], fp, fp[1:]])
+    def interp(self, x, xp, fp, left=None, right=None, period=None):
+        x, xp, fp = map(jnp.asarray, (x, xp, fp)) # this line triggers the leakage error
+        if period:
+            x = x % period
+            xp = xp % period
+            i = jnp.argsort(xp)
+            xp = xp[i]
+            fp = fp[i]
+            xp = jnp.concatenate([xp[-1:] - period, xp, xp[:1] + period])
+            fp = jnp.concatenate([fp[-1:], fp, fp[1:]])
   
-    #     i = jnp.clip(jnp.searchsorted(xp, x, side='right'), 1, len(xp) - 1)
-    #     f = (fp[i - 1] *  (xp[i] - x) + fp[i] * (x - xp[i - 1])) / (xp[i] - xp[i - 1])
+        i = jnp.clip(jnp.searchsorted(xp, x, side='right'), 1, len(xp) - 1)
+        f = (fp[i - 1] *  (xp[i] - x) + fp[i] * (x - xp[i - 1])) / (xp[i] - xp[i - 1])
 
-    #     if not period:
-    #         if left is None:
-    #             left = fp[0]
-    #         if right is None:
-    #             right = fp[-1]
-    #         f = jnp.where(x < xp[0], left, f)
-    #         f = jnp.where(x > xp[-1], right, f)
-    #     return f
+        if not period:
+            if left is None:
+                left = fp[0]
+            if right is None:
+                right = fp[-1]
+            f = jnp.where(x < xp[0], left, f)
+            f = jnp.where(x > xp[-1], right, f)
+        return f
 
     def interpolate_mol_counts(self, time_interp, mol_count, output_times):
         """
@@ -269,10 +273,16 @@ class MarkovJumpModel(pints.ForwardModel, ToyModel):
             #  2. There seems to be a bug in some scipy versions
 
             values = self.sorted_interp(output_times, time_interp, mol_count)
-            # jcospy.interpolate.
+
+            # values = self.interp(output_times, time_interp, mol_count)
+            # triggers leakage error
+
+            # values = jcospy.interpolate.interp(output_times, time_interp, mol_count)
+            # triggers Error: unsupported operand type(s) for -: 'BatchTracer' and 'list'
+            # Guess: interprets time_interp as a list
+
             # values = jax.numpy.interp(output_times, time_interp, mol_count)
-            # interp_function = jax.scipy.interpolate.RegularGridInterpolator(
-                # time_interp, mol_count,fill_value=jnp.nan, bounds_error=False)
+            # interp_function = jax.scipy.interpolate.RegularGridInterpolator(time_interp, mol_count,fill_value=jnp.nan, bounds_error=False)
             # values = interp_func(output_times)
         
         # At any point past the final time, repeat the last value

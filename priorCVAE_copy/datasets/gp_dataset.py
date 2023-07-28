@@ -64,7 +64,7 @@ class GPDataset:
 
         return self.x.repeat(n_samples).reshape(self.x.shape[0], n_samples).transpose(), gp_draws, ls_draws
 
-from pints_jax import pints
+import pints_jax 
 # import pints.toy as toy
 # import pints.toy.stochastic
 import numpyro
