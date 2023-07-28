@@ -2,10 +2,12 @@
 A repo containing modified versions of PINTS and PriorCVAE  
 
 ## Directories
-**pints** :folder for the JAX compiled version of [PINTS](https://github.com/pints-team/pints/tree/master).
-**pints_rel** :some files that come with the original PINTS repo.
-**priorCVAE_copy** :a copy with modified version of [PriorCVAE](https://github.com/elizavetasemenova/PriorCVAE_JAX).
-**vae_abc** :applications of pints/priorCVAE and projects on going.
+**docs** : folder that come with the original PINTS repo and I am lazy to decide upon its usage.  
+**examples** :examples that come with the original PINTS repo, with normal PINTS library.  
+**pints** :folder for the JAX compiled version of [PINTS](https://github.com/pints-team/pints/tree/master).    
+**pints_rel** :some files that come with the original PINTS repo.  
+**priorCVAE_copy** :a copy with modified version of [PriorCVAE](https://github.com/elizavetasemenova/PriorCVAE_JAX).  
+**vae_abc** :applications of pints/priorCVAE and projects on going.  
 
 ## References
 
