@@ -7,9 +7,9 @@ import random
 from functools import partial
 
 
-from pints_jax import pints
-import pints_jax.pints.toy as toy
-import pints_jax.pints.toy.stochastic
+import pints_jax
+import pints_jax.toy as toy
+import pints_jax.toy.stochastic
 
 # @jax.jit
 def MM(x: jnp.ndarray, initial: jnp.ndarray):
