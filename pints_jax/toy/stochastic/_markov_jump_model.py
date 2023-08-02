@@ -117,59 +117,56 @@ class MarkovJumpModel(pints.ForwardModel, ToyModel):
 
         # Initial time and count
         t = 0
-        # x = jnp.array(self._x0)
+        x = jnp.array(self._x0)
 
         # Run Gillespie SSA, calculating time until next reaction, deciding
         # which reaction, and applying it
         # self.mol_count = [jnp.array(x)]
         # self.time = [t]
         
-        arr = [prop_sum, t, max_time, cp]
-        def cond(arr):
-            return jnp.logical_and(arr[0] > 0, arr[1] <= arr[2])
+        arr = [prop_sum, 0, max_time]
         
-        def body(arr):
+
+        def f_1(arr,x):
+            def true_1(arr):
+                return arr, [0,jnp.array(self._x0)]
+            def false_1(arr):
+                pred = jnp.logical_and(arr[0] > 0, arr[1] <= arr[2])
+                def true_2(arr):
+                    cp_1 = jnp.asarray(self._propensities(self._x0, rates))
+                    V = jnp.asarray(self._V)
+                    key_1, key_2 = jax.random.split(jax.random.PRNGKey(rnd.randint(0, 9999)))
+                    r_1, r_2 = jax.random.uniform(key_1), jax.random.uniform(key_2)
+                    arr[1] += -jnp.log(r_1) / arr[0]
+                    def cond_1(sr):
+                        return sr[0][0] <= r_2 * arr[0]
             
-            cp_1 = jnp.asarray(self._propensities(self._x0, rates))
-            x = jnp.array(self._x0)
-            V = jnp.asarray(self._V)
+                    def body_2(sr):
+                        idx = sr[1][0]
+                        ad = cp_1[idx]
+                        sr = sr.at[1].add(1)
+                        sr = sr.at[0].add(ad)
+                        return jnp.asarray(sr)
 
-            # time = self.time
-            # mol_count = self.mol_count
+                    srzero = jnp.array([[0],[0]])
+                    newsr = jax.lax.while_loop(cond_fun=cond_1, body_fun=body_2, init_val=srzero)
 
-            key_1, key_2 = jax.random.split(jax.random.PRNGKey(rnd.randint(0, 9999)))
-            r_1, r_2 = jax.random.uniform(key_1), jax.random.uniform(key_2)
-            arr[1] += -jnp.log(r_1) / arr[0]
-
-            def cond_1(sr):
-                return sr[0][0] <= r_2 * arr[0]
+                    self._x0 += V[newsr[1][0] - 1]
+                # Calculate new current propensities
+                    current_propensities = self._propensities(self._x0, rates)
+                    current_propensities = jnp.asarray(current_propensities)
+                    arr[0] = jnp.sum(current_propensities)
+                    return arr, [arr[1], self._x0]
+                def false_2(arr):
+                    return arr, [arr[1], self._x0]
+                return jax.lax.cond(pred, true_2, false_2, arr)
+            pred = arr[1] == 0
+            return jax.lax.cond(pred, true_1, false_1, arr)
             
-            def body_2(sr):
-                idx = sr[1][0]
-                ad = cp_1[idx]
-                sr = sr.at[1].add(1)
-                sr = sr.at[0].add(ad)
-                return jnp.asarray(sr)
-
-            srzero = jnp.array([[0],[0]])
-            newsr = jax.lax.while_loop(cond_fun=cond_1, body_fun=body_2, init_val=srzero)
-
-            x += V[newsr[1][0] - 1]
-
-            # Calculate new current propensities
-            current_propensities = self._propensities(x, rates)
-            current_propensities = jnp.asarray(current_propensities)
-            arr[0] = jnp.sum(current_propensities)
-
-            # Store new values
-            self.time.append(arr[1])
-            self.mol_count.append(x)
-            # jnp.asarray(self.time)
-            # jnp.asarray(self.mol_count)
-            
-            return arr
-
-        last = jax.lax.while_loop(cond_fun=cond, body_fun=body, init_val=arr)
+        
+        _, last = jax.lax.scan(f_1, init = arr, xs = None, length = max_time)
+        self.time = [item[0] for item in last]
+        self.mol_count = [item[1] for item in last]
 
         return self.time, self.mol_count
 
@@ -343,33 +340,108 @@ class MarkovJumpModel(pints.ForwardModel, ToyModel):
         #     time.append(t)
         #     mol_count.append(jnp.copy(x))
 
-cond_1 = (sr[0] <= r_2 * prop_sum)
-def true_fun_1(sr):
-    sr[0] += current_propensities[sr[1]]
-    sr[1] += 1
-    return sr
+# cond_1 = (sr[0] <= r_2 * prop_sum)
+# def true_fun_1(sr):
+#     sr[0] += current_propensities[sr[1]]
+#     sr[1] += 1
+#     return sr
 
-def false_fun_1(sr):
-    return sr
+# def false_fun_1(sr):
+#     return sr
 
-f_1 = jax.lax.cond(pred=cond_1, true_fun=true_fun_1, false_fun=false_fun_1, operands=sr)
+# f_1 = jax.lax.cond(pred=cond_1, true_fun=true_fun_1, false_fun=false_fun_1, operands=sr)
 
 
-def cond_1(sr):
-    return sr[0][0] <= r_2 * arr[0]
+# def cond_1(sr):
+#     return sr[0][0] <= r_2 * arr[0]
             
-def body_2(sr):
-                idx = sr[1][0]
-                ad = cp_1[idx]
-                sr = sr.at[1].add(1)
-                sr = sr.at[0].add(ad)
-                return jnp.asarray(sr)
+# def body_2(sr):
+#                 idx = sr[1][0]
+#                 ad = cp_1[idx]
+#                 sr = sr.at[1].add(1)
+#                 sr = sr.at[0].add(ad)
+#                 return jnp.asarray(sr)
 
-srzero = jnp.array([[0],[0]])
-newsr = jax.lax.while_loop(cond_fun=cond_1, body_fun=body_2, init_val=srzero)
+# srzero = jnp.array([[0],[0]])
+# newsr = jax.lax.while_loop(cond_fun=cond_1, body_fun=body_2, init_val=srzero)
 
 
-jax.lax.scan(f_1,)
-def add_index(s,r):
+# jax.lax.scan(f_1,)
+# def add_index(s,r):
 
-jax.lax.scan(f, initial, xs, length)
+# jax.lax.scan(f, initial, xs, length)
+
+# def cond(arr):
+#     return jnp.logical_and(arr[0] > 0, arr[1] <= arr[2])
+
+# def body(arr):
+            
+#             cp_1 = jnp.asarray(self._propensities(self._x0, rates))
+#             x = jnp.array(self._x0)
+#             V = jnp.asarray(self._V)
+
+#             # time = self.time
+#             # mol_count = self.mol_count
+
+#             key_1, key_2 = jax.random.split(jax.random.PRNGKey(rnd.randint(0, 9999)))
+#             r_1, r_2 = jax.random.uniform(key_1), jax.random.uniform(key_2)
+#             arr[1] += -jnp.log(r_1) / arr[0]
+
+#             def cond_1(sr):
+#                 return sr[0][0] <= r_2 * arr[0]
+            
+#             def body_2(sr):
+#                 idx = sr[1][0]
+#                 ad = cp_1[idx]
+#                 sr = sr.at[1].add(1)
+#                 sr = sr.at[0].add(ad)
+#                 return jnp.asarray(sr)
+
+#             srzero = jnp.array([[0],[0]])
+#             newsr = jax.lax.while_loop(cond_fun=cond_1, body_fun=body_2, init_val=srzero)
+
+#             x += V[newsr[1][0] - 1]
+
+#             # Calculate new current propensities
+#             current_propensities = self._propensities(x, rates)
+#             current_propensities = jnp.asarray(current_propensities)
+#             arr[0] = jnp.sum(current_propensities)
+
+#             # Store new values
+#             self.time.append(arr[1])
+#             self.mol_count.append(x)
+#             # jnp.asarray(self.time)
+#             # jnp.asarray(self.mol_count)
+            
+#             return arr
+
+# if jnp.logical_and(arr[1] == 0,True):
+#                 return arr, [0,jnp.array(self._x0)]
+#             elif jnp.logical_and(arr[0] > 0, arr[1] <= arr[2]):
+#                 cp_1 = jnp.asarray(self._propensities(self._x0, rates))
+#                 x = jnp.array(self._x0)
+#                 V = jnp.asarray(self._V)
+#                 key_1, key_2 = jax.random.split(jax.random.PRNGKey(rnd.randint(0, 9999)))
+#                 r_1, r_2 = jax.random.uniform(key_1), jax.random.uniform(key_2)
+#                 arr[1] += -jnp.log(r_1) / arr[0]
+#                 def cond_1(sr):
+#                     return sr[0][0] <= r_2 * arr[0]
+            
+#                 def body_2(sr):
+#                     idx = sr[1][0]
+#                     ad = cp_1[idx]
+#                     sr = sr.at[1].add(1)
+#                     sr = sr.at[0].add(ad)
+#                     return jnp.asarray(sr)
+
+#                 srzero = jnp.array([[0],[0]])
+#                 newsr = jax.lax.while_loop(cond_fun=cond_1, body_fun=body_2, init_val=srzero)
+
+#                 x += V[newsr[1][0] - 1]
+#                 # Calculate new current propensities
+#                 current_propensities = self._propensities(x, rates)
+#                 current_propensities = jnp.asarray(current_propensities)
+#                 arr[0] = jnp.sum(current_propensities)
+#                 return arr, [arr[1], x]
+#             else:
+#                 return arr, [arr[1], x]
