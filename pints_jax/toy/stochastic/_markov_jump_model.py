@@ -15,6 +15,8 @@ import jax.numpy as jnp
 import jax.scipy
 from jax_cosmo import scipy as jcospy
 import jax.lax as lax
+from functools import partial
+from jax import jit
 
 import random as rnd
 
@@ -93,6 +95,7 @@ class MarkovJumpModel(pints.ForwardModel, ToyModel):
         x = jnp.array(self._x0)
         self.mol_count = [jnp.array(x)]
         self.time = [t]
+        # self.time = [jnp.array(t)]
         # if jnp.any(self._x0 < 0):
         #     raise ValueError('Initial molecule count cannot be negative.')
 
@@ -161,8 +164,8 @@ class MarkovJumpModel(pints.ForwardModel, ToyModel):
             # Store new values
             self.time.append(arr[1])
             self.mol_count.append(x)
-            jnp.asarray(self.time)
-            jnp.asarray(self.mol_count)
+            # jnp.asarray(self.time)
+            # jnp.asarray(self.mol_count)
             
             return arr
 
@@ -170,6 +173,8 @@ class MarkovJumpModel(pints.ForwardModel, ToyModel):
 
         return self.time, self.mol_count
 
+    # @partial(jit, static_argnums=2)
+    # argument 1,2 non-hashable
     def sorted_interp(self, x, xp, fp):
         m = x.shape[0]
         # n = xp.shape[0]
@@ -179,12 +184,14 @@ class MarkovJumpModel(pints.ForwardModel, ToyModel):
         xp_0 = xp[0]
         fp_0 = fp[0]
 
+        # @partial(jit, static_argnums=1)
         def inner_fun(args):
             x_i, j = args
             def cond_fun(state):
                 is_continuing, *_ = state
                 return is_continuing
 
+            # @partial(jit, static_argnums=0)
             def body_fun(state):
                 _, _, curr_j, curr_xp_j, curr_fp_j = state
 
@@ -225,7 +232,10 @@ class MarkovJumpModel(pints.ForwardModel, ToyModel):
         return f
         
     def interp(self, x, xp, fp, left=None, right=None, period=None):
-        x, xp, fp = map(jnp.asarray, (x, xp, fp)) # this line triggers the leakage error
+        # x, xp, fp = map(jnp.asarray, (x, xp, fp)) # this line triggers the leakage error
+        x = jnp.array(x)
+        xp = jnp.array(xp)
+        fp = jnp.array(fp)
         if period:
             x = x % period
             xp = xp % period
@@ -258,7 +268,7 @@ class MarkovJumpModel(pints.ForwardModel, ToyModel):
             raise ValueError('The number of entries in time must match mol_count')
 
         # Check output times
-        output_times = jnp.asarray(output_times)
+        # output_times = jnp.asarray(output_times)
         # if jnp.logical_not(jnp.all(output_times[1:] >= output_times[:-1])) :
         #     raise ValueError('The output_times must be non-decreasing.')
 
@@ -272,16 +282,19 @@ class MarkovJumpModel(pints.ForwardModel, ToyModel):
             #  1. This require scipy >= 0.17
             #  2. There seems to be a bug in some scipy versions
 
-            values = self.sorted_interp(output_times, time_interp, mol_count)
+            # values = self.sorted_interp(output_times, time_interp, mol_count)
+            # Tracer Integer conversion error
 
-            # values = self.interp(output_times, time_interp, mol_count)
+            
+            values = self.interp(output_times, time_interp, mol_count)
             # triggers leakage error
+            # time_interp is list, so need to convert to array, triggers leakage error...
 
             # values = jcospy.interpolate.interp(output_times, time_interp, mol_count)
             # triggers Error: unsupported operand type(s) for -: 'BatchTracer' and 'list'
-            # Guess: interprets time_interp as a list
+            # Guess: time_interp is list, so need to convert to array, then it triggers leakage error...
 
-            # values = jax.numpy.interp(output_times, time_interp, mol_count)
+            # values = jnp.interp(output_times, time_interp, mol_count)
             # interp_function = jax.scipy.interpolate.RegularGridInterpolator(time_interp, mol_count,fill_value=jnp.nan, bounds_error=False)
             # values = interp_func(output_times)
         
@@ -330,17 +343,33 @@ class MarkovJumpModel(pints.ForwardModel, ToyModel):
         #     time.append(t)
         #     mol_count.append(jnp.copy(x))
 
-# cond_1 = (sr[0] <= r_2 * prop_sum)
-# def true_fun_1(sr):
-#     sr[0] += current_propensities[sr[1]]
-#     sr[1] += 1
+cond_1 = (sr[0] <= r_2 * prop_sum)
+def true_fun_1(sr):
+    sr[0] += current_propensities[sr[1]]
+    sr[1] += 1
+    return sr
 
-# def false_fun_1(sr):
-#     return sr
+def false_fun_1(sr):
+    return sr
 
-# f_1 = jax.lax.cond(pred=cond_1, true_fun=true_fun_1, false_fun=false_fun_1, operands=sr)
+f_1 = jax.lax.cond(pred=cond_1, true_fun=true_fun_1, false_fun=false_fun_1, operands=sr)
 
-# jax.lax.scan(f_1,)
-# def add_index(s,r):
 
-# jax.lax.scan(f, init, xs, length)
+def cond_1(sr):
+    return sr[0][0] <= r_2 * arr[0]
+            
+def body_2(sr):
+                idx = sr[1][0]
+                ad = cp_1[idx]
+                sr = sr.at[1].add(1)
+                sr = sr.at[0].add(ad)
+                return jnp.asarray(sr)
+
+srzero = jnp.array([[0],[0]])
+newsr = jax.lax.while_loop(cond_fun=cond_1, body_fun=body_2, init_val=srzero)
+
+
+jax.lax.scan(f_1,)
+def add_index(s,r):
+
+jax.lax.scan(f, initial, xs, length)
