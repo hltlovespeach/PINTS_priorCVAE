@@ -8,6 +8,9 @@
 import numpy as np
 import pints
 import scipy
+import jax_cosmo
+import jax.numpy as jnp
+from priorCVAE_copy.utility import odeint
 
 
 class ToyLogPDF(pints.LogPDF):
@@ -179,9 +182,9 @@ class ToyODEModel(ToyModel):
 
         # calculating sensitivities
         d_dydp_dt = (
-            np.matmul(dydp, np.transpose(self.jacobian(y, t, p))) +
-            np.transpose(self._dfdp(y, t, p)))
-        return np.concatenate((dydt, d_dydp_dt.reshape(-1)))
+            jnp.matmul(dydp, np.transpose(self.jacobian(y, t, p))) +
+            jnp.transpose(self._dfdp(y, t, p)))
+        return jnp.concatenate((dydt, d_dydp_dt.reshape(-1)))
 
     def set_initial_conditions(self, y0):
         """ Sets the initial conditions of the model. """
@@ -226,15 +229,19 @@ class ToyODEModel(ToyModel):
             n_outputs = self.n_states()
             y0 = np.zeros(n_params * n_outputs + n_outputs)
             y0[0:n_outputs] = self._y0
-            result = scipy.integrate.odeint(
-                self._rhs_S1, y0, times, (parameters,))
+            result = odeint(self._rhs_S1, y0, times, parameters)
+            # result = jax_cosmo.scipy.ode.odeint(
+            #     self._rhs_S1, y0, (times,parameters))
+            # scipy.integrate.odeint(self._rhs, self._y0, times, (parameters, ))
             values = result[:, 0:n_outputs]
             dvalues_dp = (result[:, n_outputs:].reshape(
                 (len(times), n_outputs, n_params), order="F"))
             return values[offset:], dvalues_dp[offset:]
         else:
-            values = scipy.integrate.odeint(
-                self._rhs, self._y0, times, (parameters,))
+            values = odeint(self._rhs, self._y0, times, parameters)
+            # values = jax_cosmo.scipy.ode.odeint(
+            #     self._rhs, self._y0, (times,parameters))
+                # self._rhs, self._y0, times, (parameters, ))
             return values[offset:, :self.n_outputs()].squeeze()
 
     def simulateS1(self, parameters, times):

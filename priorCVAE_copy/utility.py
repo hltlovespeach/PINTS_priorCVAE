@@ -8,6 +8,7 @@ import random
 import orbax
 from flax.training import orbax_utils
 import jax.numpy as jnp
+import jax
 from flax.core import FrozenDict
 import numpy as np
 import torch
@@ -103,3 +104,22 @@ def load_model_params(ckpt_dir: str) -> FrozenDict:
     orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
     restored_params = orbax_checkpointer.restore(ckpt_dir)['params']
     return restored_params
+
+
+def odeint(fn, y0, t, params):
+    """
+    My dead-simple rk4 ODE solver. with no custom gradients
+    """
+
+    def rk4(carry, t):
+        y, t_prev = carry
+        h = t - t_prev
+        k1 = fn(y, t_prev, params)
+        k2 = fn(jnp.asarray(y) + jnp.asarray(h * k1 / 2), jnp.asarray(t_prev) + jnp.asarray(h / 2), params)
+        k3 = fn(jnp.asarray(y) + jnp.asarray(h * k2 / 2), jnp.asarray(t_prev) + jnp.asarray(h / 2), params)
+        k4 = fn(jnp.asarray(y) + jnp.asarray(h * k3), t, params)
+        y = jnp.asarray(y) + 1.0 / 6.0 * h * (k1 + 2 * k2 + 2 * k3 + k4)
+        return (y, t), y
+
+    (yf, _), y = jax.lax.scan(rk4, (jnp.asarray(y0), jnp.array(t[0])), t)
+    return y

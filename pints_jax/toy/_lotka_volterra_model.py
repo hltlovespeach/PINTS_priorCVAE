@@ -8,6 +8,8 @@
 import numpy as np
 import pints
 from . import ToyODEModel
+import jax
+import jax.numpy as jnp
 
 
 class LotkaVolterraModel(ToyODEModel, pints.ForwardModelS1):
@@ -88,13 +90,15 @@ class LotkaVolterraModel(ToyODEModel, pints.ForwardModelS1):
         """ See :meth:`pints.ForwardModel.n_parameters()`. """
         return 4
 
-    def _rhs(self, state, time, parameters):
+    # def _rhs(self, state, time, parameters):
+    def _rhs(self, state, times, parameters):
         """
         Right-hand side equation of the ode to solve.
         """
         x, y = state
         a, b, c, d = parameters
-        return np.array([a * x - b * x * y, -c * y + d * x * y])
+        # [0], parameters[1], parameters[2], parameters[3]
+        return jnp.array([a * x - b * x * y, -c * y + d * x * y])
 
     def set_initial_conditions(self, y0):
         """
