@@ -87,44 +87,63 @@ class MarkovJumpModel(pints.ForwardModel, ToyModel):
     """
     def __init__(self, x0, V, propensities):
         super(MarkovJumpModel, self).__init__()
-        self._x0 = jnp.asarray(x0)
+        self._x0 = np.asarray(x0)
         self._V = V
         self._propensities = propensities
 
         t = 0
-        x = jnp.array(self._x0)
-        self.mol_count = [jnp.array(x)]
+        x = np.array(self._x0)
+        self.mol_count = [np.array(x)]
         self.time = [t]
+        self.values = [0]
         # self.time = [jnp.array(t)]
-        # if jnp.any(self._x0 < 0):
-        #     raise ValueError('Initial molecule count cannot be negative.')
+        if np.any(self._x0 < 0):
+            raise ValueError('Initial molecule count cannot be negative.')
 
     def n_parameters(self):
         """ See :meth:`pints.ForwardModel.n_parameters()`. """
         return len(self._V)
 
-    def simulate_raw(self, rates, max_time):
+    def simulate_raw(self, rates, max_time,times):
         """ Returns raw times, mol counts when reactions occur. """
-        # if len(rates) != self.n_parameters():
-        #     raise ValueError(
-        #         'This model should have ' + str(self.n_parameters())
-        #         + ' parameter(s).')
+        if len(rates) != self.n_parameters():
+            raise ValueError(
+                'This model should have ' + str(self.n_parameters())
+                + ' parameter(s).')
 
         # Setting the current propensities and summing them up
         current_propensities = self._propensities(self._x0, rates)
-        cp = jnp.asarray(current_propensities)
-        prop_sum = jnp.sum(cp)
+        prop_sum = jnp.sum(jnp.asarray(current_propensities))
 
         # Initial time and count
         t = 0
-        # x = jnp.array(self._x0)
+        x = jnp.array(self._x0)
 
-        # Run Gillespie SSA, calculating time until next reaction, deciding
-        # which reaction, and applying it
-        # self.mol_count = [jnp.array(x)]
-        # self.time = [t]
-        
-        arr = [prop_sum, t, max_time, cp]
+        # # Run Gillespie SSA, calculating time until next reaction, deciding
+        # # which reaction, and applying it
+        # mol_count = [jnp.array(x)]
+        # time = [t]
+        # while prop_sum > 0 and t <= max_time:
+        #     r_1, r_2 = np.random.uniform(0, 1), np.random.uniform(0, 1)
+        #     t += -np.log(r_1) / prop_sum
+        #     s = 0
+        #     r = 0
+        #     while s <= r_2 * prop_sum:
+        #         s += current_propensities[r]
+        #         r += 1
+        #     x += self._V[r - 1]
+
+        #     # Calculate new current propensities
+        #     current_propensities = self._propensities(x, rates)
+        #     prop_sum = jnp.sum(current_propensities)
+
+        #     # Store new values
+        #     time.append(t)
+        #     mol_count.append(jnp.copy(x))
+
+        # return jnp.array(time), jnp.array(mol_count)
+
+        arr = [prop_sum, t, max_time, current_propensities]
         def cond(arr):
             return jnp.logical_and(arr[0] > 0, arr[1] <= arr[2])
         
@@ -137,41 +156,73 @@ class MarkovJumpModel(pints.ForwardModel, ToyModel):
             # time = self.time
             # mol_count = self.mol_count
 
-            key_1, key_2 = jax.random.split(jax.random.PRNGKey(rnd.randint(0, 9999)))
-            r_1, r_2 = jax.random.uniform(key_1), jax.random.uniform(key_2)
-            arr[1] += -jnp.log(r_1) / arr[0]
+            def t_and_mol(carry,xx):
+                current_propensities = jnp.asarray(self._propensities(self._x0, rates))
+                x = jnp.array(self._x0)
+                prop_sum, t = carry
+                key_1, key_2 = jax.random.split(jax.random.PRNGKey(rnd.randint(0, 9999)))
+                r_1, r_2 = jax.random.uniform(key_1), jax.random.uniform(key_2)
+                t = t -jnp.log(r_1) / prop_sum
+                s = 0
+                r = 0
+                cond = jnp.logical_and(s <= r_2 * prop_sum, True)
+                s = s + current_propensities[r]*cond
+                r = r + 1*cond
+                x = x + self._V[r.astype(int) - 1]*cond
+                current_propensities = self._propensities(x, rates)
+                prop_sum = jnp.sum(current_propensities)
+                return (prop_sum,t), (t,x)
+        
+            xs = jnp.asarray(range(100))
+            store = jax.lax.scan(t_and_mol,(prop_sum, t), xs)
 
-            def cond_1(sr):
-                return sr[0][0] <= r_2 * arr[0]
+            y_time = store[:][0]
+            y_mol = store[:][1]
+
+            # key_1, key_2 = jax.random.split(jax.random.PRNGKey(rnd.randint(0, 9999)))
+            # r_1, r_2 = jax.random.uniform(key_1), jax.random.uniform(key_2)
+            # arr[1] += -jnp.log(r_1) / arr[0]
+
+                # def cond_1(sr):
+                #     return sr[0][0] <= r_2 * arr[0]
+                
+                # def body_2(sr):
+                #     idx = sr[1][0]
+                #     ad = cp_1[idx]
+                #     sr = sr.at[1].add(1)
+                #     sr = sr.at[0].add(ad)
+                #     return jnp.asarray(sr)
+
+                # srzero = jnp.array([[0],[0]])
+                # newsr = jax.lax.while_loop(cond_fun=cond_1, body_fun=body_2, init_val=srzero)
+
+                # x += V[newsr[1][0] - 1]
+
+                # # Calculate new current propensities
+                # current_propensities = self._propensities(x, rates)
+                # current_propensities = jnp.asarray(current_propensities)
+                # arr[0] = jnp.sum(current_propensities)
+
+                # # Store new values
+                # self.time.append(arr[1])
+                # self.mol_count.append(x)
+                # n = len(self.time)
+                # y_time = jnp.zeros(n) 
+                # y_mol = jnp.zeros((n,4))
+                # y_time = y_time.at[:].set(self.time) # --> triggers leakage error
+                # y_mol = y_mol.at[:,:].set(self.mol_count)
+
+            # try doing the interpolation here, no luck...
+            # sorted_interp: The __index__() method was called on traced array with shape int64[].
+            # interp: Incompatible shapes for broadcasting: shapes=[(100, 4), (100,)]
+            # mol_count has shape (100,4), time has (100,)?
             
-            def body_2(sr):
-                idx = sr[1][0]
-                ad = cp_1[idx]
-                sr = sr.at[1].add(1)
-                sr = sr.at[0].add(ad)
-                return jnp.asarray(sr)
-
-            srzero = jnp.array([[0],[0]])
-            newsr = jax.lax.while_loop(cond_fun=cond_1, body_fun=body_2, init_val=srzero)
-
-            x += V[newsr[1][0] - 1]
-
-            # Calculate new current propensities
-            current_propensities = self._propensities(x, rates)
-            current_propensities = jnp.asarray(current_propensities)
-            arr[0] = jnp.sum(current_propensities)
-
-            # Store new values
-            self.time.append(arr[1])
-            self.mol_count.append(x)
-            # jnp.asarray(self.time)
-            # jnp.asarray(self.mol_count)
-            
+            self.values = self.interp(times,y_time, y_mol)
             return arr
 
         last = jax.lax.while_loop(cond_fun=cond, body_fun=body, init_val=arr)
 
-        return self.time, self.mol_count
+        return self.time, self.mol_count, self.values
 
     # @partial(jit, static_argnums=2)
     # argument 1,2 non-hashable
@@ -233,9 +284,13 @@ class MarkovJumpModel(pints.ForwardModel, ToyModel):
         
     def interp(self, x, xp, fp, left=None, right=None, period=None):
         # x, xp, fp = map(jnp.asarray, (x, xp, fp)) # this line triggers the leakage error
-        x = jnp.array(x)
-        xp = jnp.array(xp)
-        fp = jnp.array(fp)
+        n = len(x)
+        x = jnp.array(x).reshape(n,1)
+        # print(x.shape)
+        # xp = jnp.array(xp) # shape(n,)
+        # fp = jnp.array(fp) # shape(n,4)
+        # print(xp)
+        # print(fp)
         if period:
             x = x % period
             xp = xp % period
@@ -245,8 +300,22 @@ class MarkovJumpModel(pints.ForwardModel, ToyModel):
             xp = jnp.concatenate([xp[-1:] - period, xp, xp[:1] + period])
             fp = jnp.concatenate([fp[-1:], fp, fp[1:]])
   
+        # a[i-1] <= v < a[i]
         i = jnp.clip(jnp.searchsorted(xp, x, side='right'), 1, len(xp) - 1)
-        f = (fp[i - 1] *  (xp[i] - x) + fp[i] * (x - xp[i - 1])) / (xp[i] - xp[i - 1])
+        # xp = xp.reshape(n,1)
+        xp_i = xp[i].reshape(n,1)
+        xp_i_1 = xp[i-1].reshape(n,1)
+        fp_i = fp[i]
+        fp_i_1 = fp[i-1]
+        print(xp_i.shape)
+        print(x.shape)
+        # f = np.where(xp_i > xp_i_1, fp_i_1 *  (xp_i - x) + fp_i * (x - xp_i_1) / (xp_i - xp_i_1), fp_i)
+
+        what = (xp_i - x) 
+        print(what.shape)
+        f = (fp_i_1 *  (xp_i - x) )
+        f += (fp_i * (x - xp_i_1)) 
+        f = f/ (xp_i - xp_i_1)
 
         if not period:
             if left is None:
@@ -268,15 +337,15 @@ class MarkovJumpModel(pints.ForwardModel, ToyModel):
             raise ValueError('The number of entries in time must match mol_count')
 
         # Check output times
-        # output_times = jnp.asarray(output_times)
-        # if jnp.logical_not(jnp.all(output_times[1:] >= output_times[:-1])) :
-        #     raise ValueError('The output_times must be non-decreasing.')
+        output_times = np.asarray(output_times)
+        if np.logical_not(np.all(output_times[1:] >= output_times[:-1])) :
+            raise ValueError('The output_times must be non-decreasing.')
 
         # Interpolate as step function, decreasing mol_count by 1 at each
         # reaction time point.
-        if len(time_interp) == 1:
+        if len(time_interp) == 1: return np.ones(len(output_times)) * mol_count[0]
             # Need at least 2 values to interpolate
-            return jnp.ones(len(output_times)) * mol_count[0]
+            # return np.ones(len(output_times)) * mol_count[0]
         else:
             # Note: Can't use fill_value='extrapolate' here as:
             #  1. This require scipy >= 0.17
@@ -294,9 +363,10 @@ class MarkovJumpModel(pints.ForwardModel, ToyModel):
             # triggers Error: unsupported operand type(s) for -: 'BatchTracer' and 'list'
             # Guess: time_interp is list, so need to convert to array, then it triggers leakage error...
 
-            # values = jnp.interp(output_times, time_interp, mol_count)
-            # interp_function = jax.scipy.interpolate.RegularGridInterpolator(time_interp, mol_count,fill_value=jnp.nan, bounds_error=False)
-            # values = interp_func(output_times)
+            # values = np.interp(output_times, time_interp, mol_count)
+            interp_function = interpolate.RegularGridInterpolator(time_interp, mol_count,fill_value=np.nan, bounds_error=False)
+            values = interp_func(output_times)
+            # RegularGridInterpolator requires ndarray or scalar arguments
         
         # At any point past the final time, repeat the last value
         values[output_times >= time_interp[-1]] = mol_count[-1]
@@ -306,18 +376,19 @@ class MarkovJumpModel(pints.ForwardModel, ToyModel):
 
     def simulate(self, parameters, times):
         """ See :meth:`pints.ForwardModel.simulate()`. """
-        times = jnp.asarray(times)
+        times = np.asarray(times)
         # if jnp.any(times < 0):
         #     raise ValueError('Negative times are not allowed.')
 
         # Run Gillespie algorithm
-        time, mol_count = self.simulate_raw(parameters, jnp.max(times))
+        time, mol_count = self.simulate_raw(parameters, np.max(times),times)
 
-        print(time)
+        # print(time)
         # print(mol_count)
 
         # Interpolate and return
         return self.interpolate_mol_counts(time, mol_count, times)
+        # return values
 
 
 
@@ -343,33 +414,33 @@ class MarkovJumpModel(pints.ForwardModel, ToyModel):
         #     time.append(t)
         #     mol_count.append(jnp.copy(x))
 
-cond_1 = (sr[0] <= r_2 * prop_sum)
-def true_fun_1(sr):
-    sr[0] += current_propensities[sr[1]]
-    sr[1] += 1
-    return sr
+# cond_1 = (sr[0] <= r_2 * prop_sum)
+# def true_fun_1(sr):
+#     sr[0] += current_propensities[sr[1]]
+#     sr[1] += 1
+#     return sr
 
-def false_fun_1(sr):
-    return sr
+# def false_fun_1(sr):
+#     return sr
 
-f_1 = jax.lax.cond(pred=cond_1, true_fun=true_fun_1, false_fun=false_fun_1, operands=sr)
+# f_1 = jax.lax.cond(pred=cond_1, true_fun=true_fun_1, false_fun=false_fun_1, operands=sr)
 
 
-def cond_1(sr):
-    return sr[0][0] <= r_2 * arr[0]
+# def cond_1(sr):
+#     return sr[0][0] <= r_2 * arr[0]
             
-def body_2(sr):
-                idx = sr[1][0]
-                ad = cp_1[idx]
-                sr = sr.at[1].add(1)
-                sr = sr.at[0].add(ad)
-                return jnp.asarray(sr)
+# def body_2(sr):
+#                 idx = sr[1][0]
+#                 ad = cp_1[idx]
+#                 sr = sr.at[1].add(1)
+#                 sr = sr.at[0].add(ad)
+#                 return jnp.asarray(sr)
 
-srzero = jnp.array([[0],[0]])
-newsr = jax.lax.while_loop(cond_fun=cond_1, body_fun=body_2, init_val=srzero)
+# srzero = jnp.array([[0],[0]])
+# newsr = jax.lax.while_loop(cond_fun=cond_1, body_fun=body_2, init_val=srzero)
 
 
-jax.lax.scan(f_1,)
-def add_index(s,r):
+# jax.lax.scan(f_1,)
+# def add_index(s,r):
 
-jax.lax.scan(f, initial, xs, length)
+# jax.lax.scan(f, initial, xs, length)
