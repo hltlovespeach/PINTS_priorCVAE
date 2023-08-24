@@ -29,7 +29,7 @@ class LVDataset:
         params = jnp.asarray(input[idx,:])
         # print(params)
         lv = pints_jax.toy.LotkaVolterraModel().simulate(params, self.times)
-        print(lv)
+        # print(lv)
         return input, lv
         
     def simulatedata(self, n_samples: int = 1000) -> [jnp.ndarray, jnp.ndarray,jnp.ndarray]:
@@ -44,23 +44,19 @@ class LVDataset:
             - population density simulations, (n_data,2)
         """
         rng_key, _ = random.split(random.PRNGKey(rnd.randint(0, 9999)))
-        
-        
-        # params = jax.random.uniform(rng_key, shape=(1,4))
-        # params.at[1].multiply(2)
-        # params.at[3].multiply(2)
-        # params = params[0]
-        # params = params*jnp.array([1,2,1,2])
-        # print(params)
 
-        # lv_sample = pints_jax.toy.LotkaVolterraModel().simulate(params, self.times)
-
+        # params = jax.random.uniform(rng_key, shape=(self.n_data,4))
         params = jax.random.uniform(rng_key, shape=(n_samples,4))
         params = params.at[:,1].multiply(2)
         params = params.at[:,3].multiply(2)
+
+        
         xs = jnp.asarray(range(n_samples))
         lv_samples = jax.lax.scan(self.one_sample, params, xs)
-
+        
+        # params = params[:,jnp.newaxis,jnp.newaxis,:]
+        # params = jnp.tile(params, (1, self.n_data, 2, 1))
+      
 
         # times = jnp.tile(x,(n_samples,1))
         # params = jnp.zeros((n_samples,4))
@@ -72,4 +68,6 @@ class LVDataset:
 
         # lv_samples = jnp.apply_along_axis(self.fix_times, 1, params)
 
-        return self.times.repeat(n_samples).reshape(self.times.shape[0],n_samples).transpose(), params, jnp.asarray(lv_samples[1:]).reshape(n_samples,self.n_data,2)
+        return self.times.repeat(n_samples).reshape(
+            self.times.shape[0],n_samples).transpose(), jnp.asarray(
+                lv_samples[1:]).reshape(n_samples,self.n_data,2,1), params

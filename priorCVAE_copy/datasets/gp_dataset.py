@@ -71,7 +71,7 @@ import numpyro
 import numpyro.distributions as npdist
 import time
 
-class MMDataset:
+class MMMDataset:
     """
     Generate Michaelis Menten draws over the regular grid in the interval (x_lim_low, x_lim_high) with n_data points.
     This model has 3 parameter values, with 4 different molecules and an intial molecule count.
