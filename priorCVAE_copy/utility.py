@@ -108,7 +108,9 @@ def load_model_params(ckpt_dir: str) -> FrozenDict:
 
 def odeint(fn, y0, t, params):
     """
-    My dead-simple rk4 ODE solver. with no custom gradients
+    My dead-simple rk4 ODE solver. with no custom gradients.
+
+    Used in Lotka volterra data simulation.
     """
 
     def rk4(carry, t):
@@ -123,3 +125,17 @@ def odeint(fn, y0, t, params):
 
     (yf, _), y = jax.lax.scan(rk4, (jnp.asarray(y0), jnp.array(t[0])), t)
     return y
+
+def save_model_params(ckpt_dir: str, params: FrozenDict):
+    """Save the model parameters in the specified directory."""
+    ckpt = {'params': params}
+    orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
+    save_args = orbax_utils.save_args_from_target(ckpt)
+    orbax_checkpointer.save(ckpt_dir, ckpt, save_args=save_args)
+
+
+def load_model_params(ckpt_dir: str) -> FrozenDict:
+    """Load the model parameters"""
+    orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
+    restored_params = orbax_checkpointer.restore(ckpt_dir)['params']
+    return restored_params
