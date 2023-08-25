@@ -38,14 +38,21 @@ class VAE(nn.Module):
             return mean + eps * std
 
         if c is not None:
-            y = jnp.concatenate([y, c], axis=-1)
+            c_1 = c[:,jnp.newaxis,jnp.newaxis,:]
+            c_1 = jnp.tile(c_1, (1,y.shape[1], 2, 1))
+            y = jnp.concatenate([y, c_1], axis=-1)
 
         z_mu, z_logvar = self.encoder(y)
         z = reparameterize(z_rng, z_mu, z_logvar)
+        # print(z.shape)
 
         if c is not None:
+            # c_2 = jnp.tile(c, (12,1))
             z = jnp.concatenate([z, c], axis=-1)
 
         y_hat = self.decoder(z)
+        # print(y_hat.shape)
+        # print(z_mu.shape)
+        # print(z_logvar.shape)
 
         return y_hat, z_mu, z_logvar

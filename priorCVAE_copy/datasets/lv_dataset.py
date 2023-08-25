@@ -27,10 +27,21 @@ class LVDataset:
 
     def one_sample(self,input,idx):
         params = jnp.asarray(input[idx,:])
-        # print(params)
         lv = pints_jax.toy.LotkaVolterraModel().simulate(params, self.times)
-        # print(lv)
-        return input, lv
+        # key, params = input
+        # unfinished = True
+        # while unfinished:
+        #     # rng_key, _ = random.split(random.PRNGKey(rnd.randint(0, 9999)))
+        #     param = jax.random.uniform(key, shape=(1,4))
+        #     lv = pints_jax.toy.LotkaVolterraModel().simulate(param[0,:], self.times)
+        #     # if jnp.sum(jnp.isnan(lv)) == 0:
+        #     #     unfinished = False
+        #     #     params.at[idx,:].set(param)
+        #     unfinished = not jnp.sum(jnp.isnan(lv)) == 0
+        new_lv = jnp.nan_to_num(lv,copy=True, nan=0, posinf=500, neginf=-500)
+        new_lv = jnp.where(new_lv<500, new_lv, 500)
+        new_lv = jnp.where(new_lv>-500, new_lv, 500)
+        return input ,new_lv
         
     def simulatedata(self, n_samples: int = 1000) -> [jnp.ndarray, jnp.ndarray,jnp.ndarray]:
         """
@@ -45,13 +56,13 @@ class LVDataset:
         """
         rng_key, _ = random.split(random.PRNGKey(rnd.randint(0, 9999)))
 
-        # params = jax.random.uniform(rng_key, shape=(self.n_data,4))
         params = jax.random.uniform(rng_key, shape=(n_samples,4))
         params = params.at[:,1].multiply(2)
         params = params.at[:,3].multiply(2)
 
-        
+        # params = jnp.zeros((n_samples,4))
         xs = jnp.asarray(range(n_samples))
+        # input = (rng_key,params)
         lv_samples = jax.lax.scan(self.one_sample, params, xs)
         
         # params = params[:,jnp.newaxis,jnp.newaxis,:]

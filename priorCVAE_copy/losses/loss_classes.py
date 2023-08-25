@@ -90,6 +90,9 @@ class SumPixelAndKL(Loss):
         c = ls if self.conditional else None
         y_hat, z_mu, z_logvar = state.apply_fn({'params': state_params}, y, z_rng, c=c)
         pixel_loss = pixel_sum_loss(y, y_hat)
+        # print(f'pixel {pixel_loss}')
         kld_loss = kl_divergence(z_mu, z_logvar)
+        # print(f'kld {kld_loss}')
         loss = pixel_loss + .1 * kld_loss
+        # print(loss)
         return loss
