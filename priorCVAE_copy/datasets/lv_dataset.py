@@ -38,9 +38,26 @@ class LVDataset:
         #     #     unfinished = False
         #     #     params.at[idx,:].set(param)
         #     unfinished = not jnp.sum(jnp.isnan(lv)) == 0
-        new_lv = jnp.nan_to_num(lv,copy=True, nan=0, posinf=500, neginf=-500)
-        new_lv = jnp.where(new_lv<500, new_lv, 500)
-        new_lv = jnp.where(new_lv>-500, new_lv, 500)
+        new_lv = jnp.nan_to_num(lv,copy=True, nan=0, posinf=50, neginf=0)
+        new_lv = jnp.where(new_lv<50, new_lv, 50)
+        new_lv = jnp.where(new_lv>0, new_lv, 0)
+
+        zero = jnp.array([0])
+        x,y = jnp.concatenate((new_lv[:,0],zero)), jnp.concatenate((new_lv[:,1],zero))
+        rng = jnp.array(range(self.n_data+1))
+
+        id = jnp.min(jnp.where(x==50,rng,30))
+        x = jnp.where(rng>=id, 50, x)
+
+        ix = jnp.min(jnp.where(y==50,rng,30))
+        y = jnp.where(rng>=ix, 50, y)
+
+        # new_lv = jnp.zeros((30,2))
+        new_lv = new_lv.at[:,0].set(x[:self.n_data])
+        new_lv = new_lv.at[:,1].set(y[:self.n_data])
+
+        # new_lv = jnp.concatenate((x[:self.n_data],y[:self.n_data]),1)
+        # print(new_lv.shape)
         return input ,new_lv
         
     def simulatedata(self, n_samples: int = 1000) -> [jnp.ndarray, jnp.ndarray,jnp.ndarray]:
