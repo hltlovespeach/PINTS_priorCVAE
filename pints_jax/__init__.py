@@ -148,6 +148,7 @@ from ._error_measures import (
     RootMeanSquaredError,
     SumOfErrors,
     SumOfSquaresError,
+    RootMSE,
 )
 
 #
