@@ -5,11 +5,12 @@
 # released under the BSD 3-clause license. See accompanying LICENSE.md for
 # copyright notice and full license details.
 #
+import pints_jax
 import pints
 import numpy as np
 
 
-class ABCSMC(pints.ABCSampler):
+class ABCSMC(pints_jax.ABCSampler):
     r"""
     Implements the ABC-SMC algorithm as described in [1]. This
     algorithm is also referred to as ABC Population Monte Carlo

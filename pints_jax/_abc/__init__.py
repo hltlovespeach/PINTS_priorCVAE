@@ -6,10 +6,11 @@
 # copyright notice and full license details.
 #
 import pints
+import pints_jax
 import numpy as np
 
 
-class ABCSampler(pints.Loggable, pints.TunableMethod):
+class ABCSampler(pints_jax.Loggable, pints_jax.TunableMethod):
     """
     Abstract base class for ABC methods.
     All ABC samplers implement the :class:`pints.Loggable` and
@@ -74,7 +75,7 @@ class ABCController(object):
         self._log_prior = log_prior
 
         # Check error_measure
-        if not isinstance(error_measure, pints.ErrorMeasure):
+        if not isinstance(error_measure, pints_jax.ErrorMeasure):
             raise ValueError('Given error_measure must extend '
                              'pints.ErrorMeasure')
         self._error_measure = error_measure

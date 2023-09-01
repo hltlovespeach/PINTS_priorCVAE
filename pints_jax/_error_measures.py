@@ -6,6 +6,7 @@
 # copyright notice and full license details.
 #
 import pints
+import pints_jax
 import numpy as np
 
 
@@ -209,7 +210,7 @@ class RootMeanSquaredError(ProblemErrorMeasure):
     def __init__(self, problem):
         super(RootMeanSquaredError, self).__init__(problem)
 
-        if not isinstance(problem, pints.SingleOutputProblem):
+        if not isinstance(problem, pints_jax.SingleOutputProblem):
             raise ValueError(
                 'This measure is only defined for single output problems.')
 
@@ -369,3 +370,62 @@ class SumOfSquaresError(ProblemErrorMeasure):
         de = 2 * np.sum(np.sum((r.T * dy.T), axis=2) * self._weights, axis=1)
         return e, de
 
+class RootMSE(ProblemErrorMeasure):
+    r"""
+    Calculates a normalised root mean squared error:
+
+    .. math::
+        f = \sqrt{\frac{\sum _i^n (y_i - x_i) ^ 2}{n}},
+
+    where :math:`y` is the data, :math:`x` the model output and :math:`n` is
+    the total number of data points.
+
+    Extends :class:`ProblemErrorMeasure`.
+
+    Parameters
+    ----------
+    problem
+        A :class:`pints.SingleOutputProblem`.
+    """
+    def __init__(self, problem):
+        super(RootMSE, self).__init__(problem)
+
+        # if not isinstance(problem, pints.SingleOutputProblem):
+        #     raise ValueError(
+        #         'This measure is only defined for single output problems.')
+
+        self._ninv = 1.0 / len(self._values)
+
+    def __call__(self, x):
+        return np.sqrt(self._ninv * np.sum(
+            (self._problem.evaluate(x) - self._values)**2))
+    
+class Euclidean(ProblemErrorMeasure):
+    r"""
+    Calculates the Euclidean distance between two vectors
+
+    .. math::
+        f = \sqrt{\frac{\sum _i^n (y_i - x_i) ^ 2}{n}},
+
+    where :math:`y` is the data, :math:`x` the model output and :math:`n` is
+    the total number of data points.
+
+    Extends :class:`ProblemErrorMeasure`.
+
+    Parameters
+    ----------
+    problem
+        A :class:`pints.SingleOutputProblem`.
+    """
+    def __init__(self, problem):
+        super(Euclidean, self).__init__(problem)
+
+        # if not isinstance(problem, pints.SingleOutputProblem):
+        #     raise ValueError(
+        #         'This measure is only defined for single output problems.')
+
+        self._ninv = 1.0 / len(self._values)
+
+    def __call__(self, x):
+        return np.sum(np.square(self._problem.evaluate(x)))[..., None] + np.sum(
+            np.square(self._values))[..., None] - 2 * np.dot(self._problem.evaluate(x),self._values) 
