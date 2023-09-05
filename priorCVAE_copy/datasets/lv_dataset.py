@@ -73,9 +73,12 @@ class LVDataset:
         """
         rng_key, _ = random.split(random.PRNGKey(rnd.randint(0, 9999)))
 
-        params = jax.random.uniform(rng_key, shape=(n_samples,4))
-        params = params.at[:,1].multiply(2)
-        params = params.at[:,3].multiply(2)
+        # params = jax.random.uniform(rng_key, shape=(n_samples,4))
+        # consult https://eurekastatistics.com/beta-distribution-pdf-grapher/
+        params = jax.random.beta(rng_key,1.25,2,shape=(n_samples,4))
+        params = params.at[:,1:].set([0.15,1,.3])
+        # params = params.at[:,1].multiply(2)
+        # params = params.at[:,3].multiply(2)
 
         # params = jnp.zeros((n_samples,4))
         xs = jnp.asarray(range(n_samples))
