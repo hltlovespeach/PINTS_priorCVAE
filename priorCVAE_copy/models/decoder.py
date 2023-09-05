@@ -89,10 +89,10 @@ class CNNDecoder(Decoder):
         for i, (feat, k_s, stride, activation_fn) in enumerate(
                 zip(self.conv_features, conv_kernel_size, conv_stride, conv_activation)):
             if i == (len(self.conv_features) - 1):  # no activation for last layer
-                y = nn.ConvTranspose(features=feat, kernel_size=k_s, strides=(stride, stride),
+                y = nn.ConvTranspose(features=feat, kernel_size=k_s, strides=stride,
                                      padding="VALID")(y)
             else:
-                y = nn.ConvTranspose(features=feat, kernel_size=k_s, strides=(stride, stride), padding="VALID")(y)
+                y = nn.ConvTranspose(features=feat, kernel_size=k_s, strides=stride, padding="VALID")(y)
                 y = activation_fn(y)
 
         return y
