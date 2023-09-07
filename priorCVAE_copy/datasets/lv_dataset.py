@@ -74,7 +74,9 @@ class LVDataset:
         rng_key, _ = random.split(random.PRNGKey(rnd.randint(0, 9999)))
 
         params = jax.random.uniform(rng_key, shape=(n_samples,4))
-        params = params.at[:,1:].set([0.15,1,.3])
+        params_a = jax.random.beta(rng_key,1.25,2,shape=(n_samples,1))
+        params = params.at[:,0:1].set(params_a)
+        params = params.at[:,2:].set([1,.3])
         # params = params.at[:,1].multiply(2)
         # params = params.at[:,3].multiply(2)
 
@@ -151,11 +153,11 @@ class LVDataset_Beta:
             - initial population density+parameter values, 2+4 dimensional
             - population density simulations, (n_data,2)
         """
-        rng_key, _ = random.split(random.PRNGKey(rnd.randint(0, 9999)))
+        rng_key, key_2 = random.split(random.PRNGKey(rnd.randint(0, 9999)))
 
         # consult https://eurekastatistics.com/beta-distribution-pdf-grapher/
         params = jax.random.beta(rng_key,1.25,2,shape=(n_samples,4))
-        params = params.at[:,1:].set([0.15,1,.3])
+        params = params.at[:,2:].set([1,.3])
         # params = params.at[:,1].multiply(2)
         # params = params.at[:,3].multiply(2)
 
